@@ -1,0 +1,36 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	 "http://www.w3.org/TR/html4/strict.dtd">
+
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>ergo</title>
+	<link type="text/css" rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.1.7/semantic.min.css">
+	<link rel="stylesheet" href="style.css" type="text/css">
+	
+	<script language="javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.1.7/semantic.min.js"></script>
+	<script src="./lib/arbor.js"></script>  
+
+	<script src="main.js"></script>
+	
+</head>
+<body>
+	<div class="ui wide sidebar inverted vertical menu">
+	</div>
+	<div class="pusher">
+		<div class="ui secondary fixed menu">
+			<div class="header item" onclick="eachNode()">
+				ergo
+			</div>
+			<a class="item" onclick="addEdge()">
+				Add edge
+			</a>
+			<a class="item" onclick="sidebar()">
+				Sidebar
+			</a>
+		</div>
+		<canvas id="viewport" width="1000" height="600"></canvas>
+	</div>
+</body>
+</html>
