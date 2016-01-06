@@ -7,9 +7,8 @@ var argument;
 	var Renderer = function(canvas){
 		var canvas = $(canvas).get(0)
 		var ctx = canvas.getContext("2d");
-		var img = document.getElementById("ellipse");
-		var particleSystem
-		var container = window
+		var particleSystem;
+		var container = window;
 
 		var that = {
 			init:function(system){
@@ -27,18 +26,19 @@ var argument;
 			
 			redraw:function(){
 
+				// draw canvas
 				ctx.fillStyle = "white";
 				ctx.fillRect(0,0, canvas.width, canvas.height);
 				
+				// draw edges
 				particleSystem.eachEdge(function(edge, pt1, pt2){
 					ctx.save();
-					
 					var color = edge.data.positive ? "rgba(0, 200, 0, 1)" : "rgba(200, 0, 0, 1)";
-					
-					arrow(ctx, pt1, pt2, radius, color);
+					lib.drawArrow(ctx, pt1, pt2, radius, color);
 					ctx.restore();
 				});
 
+				// draw nodes
 				particleSystem.eachNode(function(node, pt){
 					ctx.save();
 					ctx.beginPath();
@@ -54,8 +54,6 @@ var argument;
 						ctx.strokeStyle = "#ddd";
 						ctx.fillStyle = "#fefefe";
 						ctx.lineWidth = 8;
-						//ctx.beginPath();
-						//ctx.arc(pt.x, pt.y, radius - ctx.lineWidth, 0, 2 * Math.PI);
 						ctx.stroke();
 					}
 					
@@ -75,7 +73,6 @@ var argument;
 					
 					ctx.restore();
 				});
-				
 			},
 			
 			resize:function(){
@@ -87,7 +84,7 @@ var argument;
 			},
 			
 			initMouseHandling:function(){
-				// no-nonsense drag and drop (thanks springy.js)
+				// drag and drop
 				var dragged = null;
 				var selected = null;
 				var dragOffset = null;
@@ -101,14 +98,14 @@ var argument;
 						var nearest = particleSystem.nearest(_mouseP);
 						
 						if(nearest.distance <= radius) {
-							if(selected) selected.node.data.selected = false;
+							if(selected) lib.deselect(selected);
 							selected = dragged = nearest;
-							selected.node.data.selected = true;
+							lib.select(selected);
 							dragged.node.data.dragged = true;
 							dragOffset = dragged.node.p.subtract(particleSystem.fromScreen(_mouseP));
 						}
 						else if(selected) {
-							selected.node.data.selected = false;
+							lib.deselect(selected);
 						}
 
 						if (dragged && dragged.node !== null){
@@ -121,24 +118,16 @@ var argument;
 
 						return false
 					},
+					
 					dragged:function(e){
 						var pos = $(canvas).offset();
 						var s = arbor.Point(e.pageX-pos.left, e.pageY-pos.top);
-
+						
 						if (dragged && dragged.node !== null){
 							var p = particleSystem.fromScreen(s).add(dragOffset);
 							dragged.node.p = p;
 						}
-						/*var pos = $(canvas).offset();
-						var newPointScreen = lastPointScreen = arbor.Point(e.pageX-pos.left, e.pageY-pos.top);
-						var differenceScreen = newPointScreen.subtract(lastPointScreen);
-						var differenceParticle = particleSystem.fromScreen(differenceScreen);
-						var newPointParticle = dragged.node.p.add(differenceParticle);
 						
-						if (dragged && dragged.node !== null) {
-							dragged.node.p = newPointParticle;
-						}*/
-
 						return false
 					},
 
@@ -163,7 +152,7 @@ var argument;
 			
 		}
 		return that
-	}    
+	}
 
 	$(document).ready(function(){
 		argument = arbor.ParticleSystem(50, 2600, 0.5) // repulsion/stiffness/friction (500, 600, 0.5)
@@ -171,12 +160,15 @@ var argument;
 		argument.renderer = Renderer("#viewport") // our newly created renderer will have its .init() method called shortly by sys...
 
 		// add some nodes to the graph and watch it go...
-		argument.addNode('a', {conclusion: true});
-		argument.addEdge('b','a', {positive: true});
-		argument.addEdge('c','a', {positive: false});
-		argument.addEdge('d','a', {positive: true});
-		argument.addEdge('e','a', {positive: true});
-		//sys.addNode('f', {})
+		argument.addNode('a', {conclusion: true, content: "911 was an inside job."});
+		argument.addNode('b', {content: "Jet fuel can't melt steal beams."});
+		argument.addNode('c', {content: "A premise"});
+		argument.addNode('d', {content: "Another premise"});
+		argument.addNode('e', {content: "Yet another premise"});
+		argument.addEdge('b', 'a', {positive: true});
+		argument.addEdge('c', 'a', {positive: true});
+		argument.addEdge('d', 'a', {positive: false});
+		argument.addEdge('e', 'a', {positive: true});
 		
 		// initialize popup tips
 		$('.popup-tips').popup();
@@ -185,98 +177,97 @@ var argument;
 
 })(this.jQuery)
 
-function drawEllipse(context, centerX, centerY, width, height, color) {
-	
-	context.beginPath();
-	
-	context.moveTo(centerX, centerY - height/2); // A1
-	
-	context.bezierCurveTo(
-		centerX + width/2, centerY - height/2, // C1
-		centerX + width/2, centerY + height/2, // C2
-		centerX, centerY + height/2); // A2
-
-	context.bezierCurveTo(
-		centerX - width/2, centerY + height/2, // C3
-		centerX - width/2, centerY - height/2, // C4
-		centerX, centerY - height/2); // A1
- 
-	context.fillStyle = color;
-	context.fill();
-	context.closePath();	
-}
-
-var arrow = function(ctx, pt1, pt2, offset, color) {
-	ctx.save();
-	
-	var dest = pointOnLine(pt1, pt2, -(offset + 10));
-
-	// draw a line from pt1 to pt2
-	ctx.strokeStyle = "#ddd"
-	ctx.lineWidth = 4;
-	ctx.beginPath()
-	ctx.moveTo(pt1.x, pt1.y)
-	ctx.lineTo(dest.x, dest.y);
-	ctx.stroke()
-	
-	//now the point
-	ctx.strokeStyle = color;
-	ctx.lineWidth = 8;
-	var startArrow = pointOnLine(pt1, pt2, -(offset + 28));
-	ctx.beginPath();
-	ctx.moveTo(startArrow.x, startArrow.y);
-	ctx.lineTo(dest.x, dest.y);
-	//ctx.lineTo(100,25);
-	ctx.stroke();
-	
-	ctx.restore();
-}
-
-var pointOnLine = function(pt1, pt2, offset) {
-	var vector1X = pt2.x - pt1.x;
-	var vector1Y = pt2.y - pt1.y;
-
-	var magnitude = Math.sqrt( Math.pow(vector1Y, 2) + Math.pow(vector1X, 2) );
-	var directionX = vector1X / magnitude;
-	var directionY = vector1Y / magnitude;
-	
-	magnitude += offset;
-	
-	var vector2X = directionX * magnitude;
-	var vector2Y = directionY * magnitude;
-	
-	var dest = {};
-	
-	dest.x = vector2X + pt1.x;
-	dest.y = vector2Y + pt1.y;
-	
-	return dest;
-}
-
-var magnitude = function() {
-	
-}
-
-$('#myCanvas').bind('mousemove', function (e) {
-	var offset = $(this).offset();
-	var p1 = [200.0, 200.0];
-	var p2 = [e.pageX - offset.left, e.pageY - offset.top];
-
-	ctx.clearRect(0, 0, 400, 400);
-	grid();
-	arrow(p1, p2);
-})                                  
-
 var addEdge = function() {
-	argument.addEdge('f','e', {positive: false})
+	argument.addEdge('f','e', {positive: false, content: "Late to the party."})
 }
 
-var sidebar = function() {
+var togglePanel = function() {
 	$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('toggle');
 }
 
 var eachNode = function() {
 	argument.eachNode( (node, pt) => {
-		console.log(node.mass);
+		console.log(node.data);
 	});
+}
+
+var lib = {
+	select: function(selected) {
+		$('#panel-content').html(selected.node.data.content);
+		selected.node.data.selected = true;
+	},
+	
+	deselect: function(selected) {
+		selected.node.data.selected = false;
+		$('#panel-content').html('');
+	},
+	
+	pointOnLine: function(pt1, pt2, offset) {
+		var vector1X = pt2.x - pt1.x;
+		var vector1Y = pt2.y - pt1.y;
+
+		var magnitude = Math.sqrt( Math.pow(vector1Y, 2) + Math.pow(vector1X, 2) );
+		var directionX = vector1X / magnitude;
+		var directionY = vector1Y / magnitude;
+		
+		magnitude += offset;
+		
+		var vector2X = directionX * magnitude;
+		var vector2Y = directionY * magnitude;
+		
+		var dest = {};
+		
+		dest.x = vector2X + pt1.x;
+		dest.y = vector2Y + pt1.y;
+		
+		return dest;
+	},
+	
+	drawArrow: function(ctx, pt1, pt2, offset, color) {
+		ctx.save();
+		
+		var dest = lib.pointOnLine(pt1, pt2, -(offset + 10));
+
+		// draw a line from pt1 to pt2
+		ctx.strokeStyle = "#ddd"
+		ctx.lineWidth = 4;
+		ctx.beginPath()
+		ctx.moveTo(pt1.x, pt1.y)
+		ctx.lineTo(dest.x, dest.y);
+		ctx.stroke()
+		
+		//now the point
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 8;
+		var startArrow = lib.pointOnLine(pt1, pt2, -(offset + 28));
+		ctx.beginPath();
+		ctx.moveTo(startArrow.x, startArrow.y);
+		ctx.lineTo(dest.x, dest.y);
+		//ctx.lineTo(100,25);
+		ctx.stroke();
+		
+		ctx.restore();
+	},
+	
+	// not using right now
+	/*drawEllipse: function(context, centerX, centerY, width, height, color) {
+		
+		context.beginPath();
+		
+		context.moveTo(centerX, centerY - height/2); // A1
+		
+		context.bezierCurveTo(
+			centerX + width/2, centerY - height/2, // C1
+			centerX + width/2, centerY + height/2, // C2
+			centerX, centerY + height/2); // A2
+
+		context.bezierCurveTo(
+			centerX - width/2, centerY + height/2, // C3
+			centerX - width/2, centerY - height/2, // C4
+			centerX, centerY - height/2); // A1
+	 
+		context.fillStyle = color;
+		context.fill();
+		context.closePath();	
+	}*/
 }
