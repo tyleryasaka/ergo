@@ -1,8 +1,14 @@
-var argument;
+var app = angular.module('ergo', []);
 
-(function($){
-	
+app.controller('main', function($scope) {
+	var argument;
 	var radius = 40;
+	var repulsion = 50;
+	var stiffness = 1000;
+	var friction = 5000;
+	$scope.selected;
+	$scope.nodeIndex = 0;
+	$scope.immediateChildCount = 0;
 
 	var Renderer = function(canvas){
 		var canvas = $(canvas).get(0)
@@ -86,8 +92,8 @@ var argument;
 			initMouseHandling:function(){
 				// drag and drop
 				var dragged = null;
-				var selected = null;
 				var dragOffset = null;
+				$scope.selected = null;
 
 				// set up a handler object that will initially listen for mousedowns then
 				// for moves and mouseups while dragging
@@ -98,14 +104,14 @@ var argument;
 						var nearest = particleSystem.nearest(_mouseP);
 						
 						if(nearest.distance <= radius) {
-							if(selected) lib.deselect(selected);
-							selected = dragged = nearest;
-							lib.select(selected);
+							if($scope.selected) lib.deselect($scope.selected);
+							$scope.selected = dragged = nearest;
+							lib.select($scope.selected);
 							dragged.node.data.dragged = true;
 							dragOffset = dragged.node.p.subtract(particleSystem.fromScreen(_mouseP));
 						}
-						else if(selected) {
-							lib.deselect(selected);
+						else if($scope.selected) {
+							lib.deselect($scope.selected);
 						}
 
 						if (dragged && dragged.node !== null){
@@ -150,124 +156,179 @@ var argument;
 
 			},
 			
-		}
+		};
+		
+		// open panel when double clicking on node
+		// hide panel when double clicking on empty space
+		$('#viewport').dblclick( function(e) {
+			var pos = $(canvas).offset();
+			_mouseP = arbor.Point(e.pageX-pos.left, e.pageY-pos.top)
+			var nearest = particleSystem.nearest(_mouseP);
+			
+			if(nearest.distance <= radius) {
+				$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('show');
+			}
+			else {
+				$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('hide');
+			}
+		});
+		
 		return that
 	}
 
 	$(document).ready(function(){
-		argument = arbor.ParticleSystem(50, 2600, 0.5) // repulsion/stiffness/friction (500, 600, 0.5)
-		argument.parameters({gravity:true}) // use center-gravity to make the graph settle nicely (ymmv)
+		argument = arbor.ParticleSystem(0, stiffness, friction) // repulsion/stiffness/friction (500, 600, 0.5)
+		argument.parameters({gravity: false}) // use center-gravity to make the graph settle nicely (ymmv)
 		argument.renderer = Renderer("#viewport") // our newly created renderer will have its .init() method called shortly by sys...
 
-		// add some nodes to the graph and watch it go...
-		argument.addNode('a', {conclusion: true, content: "911 was an inside job."});
-		argument.addNode('b', {content: "Jet fuel can't melt steal beams."});
-		argument.addNode('c', {content: "A premise"});
-		argument.addNode('d', {content: "Another premise"});
-		argument.addNode('e', {content: "Yet another premise"});
-		argument.addEdge('b', 'a', {positive: true});
-		argument.addEdge('c', 'a', {positive: true});
-		argument.addEdge('d', 'a', {positive: false});
-		argument.addEdge('e', 'a', {positive: true});
+		// initial conclusion node
+		argument.addNode('conclusion', {conclusion: true, content: ""});
 		
 		// initialize popup tips
 		$('.popup-tips').popup();
-;
 	});
-
-})(this.jQuery)
-
-var addEdge = function() {
-	argument.addEdge('f','e', {positive: false, content: "Late to the party."})
-}
-
-var togglePanel = function() {
-	$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('toggle');
-}
-
-var eachNode = function() {
-	argument.eachNode( (node, pt) => {
-		console.log(node.data);
-	});
-}
-
-var lib = {
-	select: function(selected) {
-		$('#panel-content').html(selected.node.data.content);
-		selected.node.data.selected = true;
-	},
 	
-	deselect: function(selected) {
-		selected.node.data.selected = false;
-		$('#panel-content').html('');
-	},
+	$scope.oneSelected = function() {
+		return $scope.selected && $scope.selected.node.data.selected;
+	}
 	
-	pointOnLine: function(pt1, pt2, offset) {
-		var vector1X = pt2.x - pt1.x;
-		var vector1Y = pt2.y - pt1.y;
-
-		var magnitude = Math.sqrt( Math.pow(vector1Y, 2) + Math.pow(vector1X, 2) );
-		var directionX = vector1X / magnitude;
-		var directionY = vector1Y / magnitude;
-		
-		magnitude += offset;
-		
-		var vector2X = directionX * magnitude;
-		var vector2Y = directionY * magnitude;
-		
-		var dest = {};
-		
-		dest.x = vector2X + pt1.x;
-		dest.y = vector2Y + pt1.y;
-		
-		return dest;
-	},
+	$scope.addEdge = function(to, positive) {
+		$scope.nodeIndex++;
+		var newData = {conclusion: false, content: ''};
+		if(to.data.conclusion) {
+			$scope.immediateChildCount++;
+			newData.isImmediateChild = true;
+		}
+		var newNode = argument.addNode($scope.nodeIndex.toString(), newData);
+		argument.addEdge(newNode, to, {positive: positive});
+		// Gotta handle arborjs glitch when there is only one node
+		if(to.data.conclusion && $scope.immediateChildCount == 1) {
+			window.setTimeout(function() {
+				argument.parameters({repulsion: repulsion});
+			}, 250);
+		}
+	}
 	
-	drawArrow: function(ctx, pt1, pt2, offset, color) {
-		ctx.save();
-		
-		var dest = lib.pointOnLine(pt1, pt2, -(offset + 10));
-
-		// draw a line from pt1 to pt2
-		ctx.strokeStyle = "#ddd"
-		ctx.lineWidth = 4;
-		ctx.beginPath()
-		ctx.moveTo(pt1.x, pt1.y)
-		ctx.lineTo(dest.x, dest.y);
-		ctx.stroke()
-		
-		//now the point
-		ctx.strokeStyle = color;
-		ctx.lineWidth = 8;
-		var startArrow = lib.pointOnLine(pt1, pt2, -(offset + 28));
-		ctx.beginPath();
-		ctx.moveTo(startArrow.x, startArrow.y);
-		ctx.lineTo(dest.x, dest.y);
-		//ctx.lineTo(100,25);
-		ctx.stroke();
-		
-		ctx.restore();
-	},
+	$scope.pruneNode = function(node) {
+		$('#confirm-delete').modal({
+			onApprove: function() {
+				pruneNode(node);
+			}
+		}).modal('show');
+	}
 	
-	// not using right now
-	/*drawEllipse: function(context, centerX, centerY, width, height, color) {
-		
-		context.beginPath();
-		
-		context.moveTo(centerX, centerY - height/2); // A1
-		
-		context.bezierCurveTo(
-			centerX + width/2, centerY - height/2, // C1
-			centerX + width/2, centerY + height/2, // C2
-			centerX, centerY + height/2); // A2
+	var pruneNode = function(node) {
+		var edges = argument.getEdgesTo(node);
+		for(var i=0; i<edges.length; i++) {
+			pruneNode(edges[i].source);
+		}
+		// Gotta handle arborjs glitch when there is only one node
+		if(node.data.isImmediateChild) {
+			if($scope.immediateChildCount == 1) {
+				argument.parameters({repulsion: 0});
+			}
+			$scope.immediateChildCount--;
+			setTimeout(function() {
+				argument.pruneNode(node);
+			}, 250);
+		}
+		else {
+			argument.pruneNode(node);
+		}
+	}
 
-		context.bezierCurveTo(
-			centerX - width/2, centerY + height/2, // C3
-			centerX - width/2, centerY - height/2, // C4
-			centerX, centerY - height/2); // A1
-	 
-		context.fillStyle = color;
-		context.fill();
-		context.closePath();	
-	}*/
-}
+	$scope.togglePanel = function() {
+		$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('toggle');
+	}
+
+	$scope.eachNode = function() {
+		argument.eachNode( (node, pt) => {
+			console.log(node.data);
+		});
+	}
+
+	var lib = {
+		select: function(selected) {
+			//$('#panel-content textarea').val(selected.node.data.content);
+			selected.node.data.selected = true;
+			$scope.$apply();
+		},
+		
+		deselect: function(selected) {
+			//$('#panel-content textarea').val('');
+			selected.node.data.selected = false;
+			$scope.$apply();
+		},
+		
+		pointOnLine: function(pt1, pt2, offset) {
+			var vector1X = pt2.x - pt1.x;
+			var vector1Y = pt2.y - pt1.y;
+
+			var magnitude = Math.sqrt( Math.pow(vector1Y, 2) + Math.pow(vector1X, 2) );
+			var directionX = vector1X / magnitude;
+			var directionY = vector1Y / magnitude;
+			
+			magnitude += offset;
+			
+			var vector2X = directionX * magnitude;
+			var vector2Y = directionY * magnitude;
+			
+			var dest = {};
+			
+			dest.x = vector2X + pt1.x;
+			dest.y = vector2Y + pt1.y;
+			
+			return dest;
+		},
+		
+		drawArrow: function(ctx, pt1, pt2, offset, color) {
+			ctx.save();
+			
+			var dest = lib.pointOnLine(pt1, pt2, -(offset + 10));
+
+			// draw a line from pt1 to pt2
+			ctx.strokeStyle = "#ddd"
+			ctx.lineWidth = 4;
+			ctx.beginPath()
+			ctx.moveTo(pt1.x, pt1.y)
+			ctx.lineTo(dest.x, dest.y);
+			ctx.stroke()
+			
+			//now the point
+			ctx.strokeStyle = color;
+			ctx.lineWidth = 8;
+			var startArrow = lib.pointOnLine(pt1, pt2, -(offset + 28));
+			ctx.beginPath();
+			ctx.moveTo(startArrow.x, startArrow.y);
+			ctx.lineTo(dest.x, dest.y);
+			//ctx.lineTo(100,25);
+			ctx.stroke();
+			
+			ctx.restore();
+		},
+		
+		// not using right now
+		/*drawEllipse: function(context, centerX, centerY, width, height, color) {
+			
+			context.beginPath();
+			
+			context.moveTo(centerX, centerY - height/2); // A1
+			
+			context.bezierCurveTo(
+				centerX + width/2, centerY - height/2, // C1
+				centerX + width/2, centerY + height/2, // C2
+				centerX, centerY + height/2); // A2
+
+			context.bezierCurveTo(
+				centerX - width/2, centerY + height/2, // C3
+				centerX - width/2, centerY - height/2, // C4
+				centerX, centerY - height/2); // A1
+		 
+			context.fillStyle = color;
+			context.fill();
+			context.closePath();	
+		}*/
+	}
+	
+});
+

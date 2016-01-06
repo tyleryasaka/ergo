@@ -15,6 +15,12 @@
 	top: 20px;
 }
 
+#panel-menu {
+	position: absolute;
+	left: 20px;
+	top: 70px;
+}
+
 #toggle-panel-2.ui.slider.checkbox label {
 	color: #fff;
 }
@@ -24,6 +30,10 @@ body {
 }
 
 #panel-content {
-	min-height: 100px;
+	min-height: 250px;
 	padding: 20px 20px 20px 80px;
+}
+
+.light {
+	opacity: .5;
 }

@@ -5,36 +5,79 @@
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<title>ergo</title>
-	<link type="text/css" rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.1.7/semantic.min.css">
+	<link type="text/css" rel="stylesheet" href="./lib/semantic.min.css">
 	<link rel="stylesheet" href="style.css" type="text/css">
 	
-	<script language="javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
-	<script src="//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.1.7/semantic.min.js"></script>
+	<script language="javascript" src="./lib/jquery.min.js"></script>
+	<script src="./lib/semantic.min.js"></script>
 	<script src="./lib/arbor.js"></script>  
+	<script src="./lib/angular.min.js"></script>  
 
 	<script src="main.js"></script>
 	
 </head>
-<body>
+<body ng-app="ergo" ng-controller="main">
 	<div class="pusher">
+		
 		<div class="ui secondary fixed menu">
-			<div class="header item" onclick="eachNode()">
+			<div class="header item">
 				ergo
 			</div>
-			<a class="item" onclick="addEdge()">
-				Add edge
-			</a>
 		</div>
+		
 		<canvas id="viewport" width="1000" height="600"></canvas>
-		<button class="ui icon button popup-tips" id="toggle-panel-1" onclick="togglePanel()" data-content="Expand panel">
-			<i class="angle up icon"></i>
+		
+		<button class="ui icon button popup-tips" id="toggle-panel-1" ng-click="togglePanel()" data-content="Expand panel">
+			<i class="large angle up icon"></i>
 		</button>
+		
+		<div class="ui small modal" id="confirm-delete">
+			<i class="close icon"></i>
+			<div class="header">
+				Delete statement
+			</div>
+			<div class="image content">
+				<div class="image">
+					<i class="trash icon"></i>
+				</div>
+				<div class="description">
+					<p>Delete this statement? (All children will be deleted.)</p>
+				</div>
+			</div>
+			<div class="actions">
+				<div class="ui red cancel button">
+					<i class="remove icon"></i>
+					No
+				</div>
+				<div class="ui green approve button">
+					<i class="checkmark icon"></i>
+					Yes
+				</div>
+			</div>
+		</div>
+		
 	</div>
 	<div class="ui bottom sidebar visible vertical menu">
-		<button class="ui icon button popup-tips" id="toggle-panel-2" onclick="togglePanel()" data-content="Collapse panel">
-			<i class="angle down icon"></i>
+		<button class="ui icon button popup-tips" id="toggle-panel-2" ng-click="togglePanel()" data-content="Collapse panel">
+			<i class="large angle down icon"></i>
 		</button>
+		<div class="ui vertical icon buttons" id="panel-menu">
+			<button ng-click="addEdge(selected.node, true)" class="ui button popup-tips" ng-class="{disabled: !oneSelected()}" data-content="New supporting statement"><i class="large green plus icon"></i></button>
+			<button ng-click="addEdge(selected.node, false)" class="ui button popup-tips" ng-class="{disabled: !oneSelected()}" data-content="New opposing statement"><i class="large red plus icon"></i></button>
+			<button class="ui button popup-tips" ng-class="{disabled: !oneSelected() || selected.node.data.conclusion}" data-content="Hide children"><i class="large toggle on icon"></i></button>
+			<button ng-click="pruneNode(selected.node)" class="ui button popup-tips" ng-class="{disabled: !oneSelected() || selected.node.data.conclusion}" data-content="Delete statement"><i class="large trash icon"></i></button>
+		</div>
+		<!--button class="ui icon button popup-tips" id="panel-menu" data-content="Actions">
+		</button-->
 		<div id="panel-content">
+			<div class="ui form">
+				<div class="field">
+					<textarea ng-show="oneSelected()" ng-model="selected.node.data.content"></textarea>
+					<span class="light" ng-show="!oneSelected()">
+						Nothing selected
+					</span>
+				</div>
+			</div>
 		</div>
 	</div>
 </body>
