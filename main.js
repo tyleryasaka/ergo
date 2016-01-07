@@ -1,16 +1,20 @@
 var app = angular.module('ergo', []);
 
 app.controller('main', function($scope) {
-	var argument;
-	var radius = 40;
-	var repulsion = 50;
-	var stiffness = 1000;
-	var friction = 5000;
+	$scope.system;
+	$scope.userPhysics = { // string values from input
+		radius: 40,
+		repulsion: 50,
+		stiffness: 1000,
+		friction: 5000
+	};
+	$scope.physics = {}; // string values will be onverted to numbers here
+	$scope.conclusion;
 	$scope.selected;
 	$scope.grabbed;
 	$scope.hovered;
 	$scope.nodeIndex = 0;
-	$scope.immediateChildCount = 0;
+	$scope.allNodesVisible = true;
 
 	var Renderer = function(canvas){
 		var canvas = $(canvas).get(0)
@@ -33,6 +37,7 @@ app.controller('main', function($scope) {
 			},
 			
 			redraw:function(){
+				var allNodesVisible = true; // each cycle check if any nodes are hidden
 
 				// draw canvas
 				ctx.fillStyle = "white";
@@ -43,7 +48,7 @@ app.controller('main', function($scope) {
 					if(edge.data.show) {
 						ctx.save();
 						var color = edge.data.positive ? "rgba(0, 200, 0, 1)" : "rgba(200, 0, 0, 1)";
-						lib.drawArrow(ctx, pt1, pt2, radius, color);
+						lib.drawArrow(ctx, pt1, pt2, $scope.physics.radius, color);
 						ctx.restore();
 					}
 				});
@@ -54,7 +59,7 @@ app.controller('main', function($scope) {
 						ctx.save();
 						ctx.beginPath();
 						
-						ctx.arc(pt.x, pt.y, radius, 0, 2 * Math.PI);
+						ctx.arc(pt.x, pt.y, $scope.physics.radius, 0, 2 * Math.PI);
 						
 						if(node.data.conclusion) {
 							ctx.strokeStyle = "#ddd";
@@ -74,19 +79,19 @@ app.controller('main', function($scope) {
 						if(node.data.selected) {
 							ctx.shadowBlur = null;
 							ctx.beginPath();
-							ctx.arc(pt.x, pt.y, radius / 2, 0, 2 * Math.PI);
+							ctx.arc(pt.x, pt.y, $scope.physics.radius / 2, 0, 2 * Math.PI);
 							ctx.fillStyle = "#aaa";
 							ctx.fill();
 						}
 						
-						/*var distance = node.subtract(_mouseP).magnitude();
-						if(distance <= radius) {
-							ctx.fillStyle = '#000';
-						}*/
-						
 						ctx.restore();
+					} else {
+						allNodesVisible = false;
 					}
 				});
+				
+				$scope.allNodesVisible = allNodesVisible; // once all nodes have been checked, update global variable
+				$scope.$apply();
 			},
 			
 			resize:function(){
@@ -110,7 +115,7 @@ app.controller('main', function($scope) {
 						_mouseP = arbor.Point(e.pageX-pos.left, e.pageY-pos.top)
 						var nearest = particleSystem.nearest(_mouseP);
 						
-						if(nearest.distance <= radius) {
+						if(nearest.distance <= $scope.physics.radius) {
 							if($scope.selected) lib.deselect($scope.selected);
 							lib.grab(nearest.node);
 							lib.select(nearest.node);
@@ -162,7 +167,7 @@ app.controller('main', function($scope) {
 			_mouseP = arbor.Point(e.pageX-pos.left, e.pageY-pos.top)
 			var nearest = particleSystem.nearest(_mouseP);
 			
-			if(nearest.distance <= radius) {
+			if(nearest.distance <= $scope.physics.radius) {
 				$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('show');
 			}
 			else {
@@ -175,7 +180,7 @@ app.controller('main', function($scope) {
 			_mouseP = arbor.Point(e.pageX-pos.left, e.pageY-pos.top)
 			var nearest = particleSystem.nearest(_mouseP);
 
-			if(nearest.distance <= radius) {
+			if(nearest.distance <= $scope.physics.radius) {
 				lib.hover(nearest.node);
 			} else if($scope.hovered) {
 				lib.unhover($scope.hovered);
@@ -186,33 +191,39 @@ app.controller('main', function($scope) {
 	}
 
 	$(document).ready(function(){
-		argument = arbor.ParticleSystem() // repulsion/stiffness/friction (500, 600, 0.5)
-		argument.parameters({
+		for(var attribute in $scope.userPhysics) {
+			$scope.physics[attribute] = Number($scope.userPhysics[attribute]);
+		}
+		$scope.system = arbor.ParticleSystem() // repulsion/stiffness/friction (500, 600, 0.5)
+		$scope.system.parameters({
 			repulsion: 0,
-			stiffness: stiffness,
-			friction: friction,
+			stiffness: $scope.physics.stiffness,
+			friction: $scope.physics.friction,
 			gravity: false
 		});
-		argument.renderer = Renderer("#viewport") // our newly created renderer will have its .init() method called shortly by sys...
+		$scope.system.renderer = Renderer("#viewport") // our newly created renderer will have its .init() method called shortly by sys...
 
 		// initial conclusion node
-		argument.addNode('conclusion', {
+		$scope.conclusion = $scope.system.addNode('conclusion', {
 			conclusion: true,
 			content: "",
 			showChildren: true,
-			show: true
+			show: true,
+			childCount: 0
 		});
 		
 		// initialize popup tips
 		$('.popup-tips').popup();
 	});
 	
-	$scope.addEdge = function(to, positive) {
+	$scope.addNode = function(to, positive) {
+		to.data.childCount++;
 		var newData = {
 			conclusion: false,
 			content: '',
 			showChildren: true,
-			show: true
+			show: true,
+			childCount: 0
 		};
 		var newEdge = {
 			positive: positive,
@@ -221,17 +232,18 @@ app.controller('main', function($scope) {
 		$scope.nodeIndex++;
 		// Gotta handle arborjs glitch when there is only one node
 		if(to.data.conclusion) {
-			$scope.immediateChildCount++;
 			newData.isImmediateChild = true;
 		}
-		var newNode = argument.addNode($scope.nodeIndex.toString(), newData);
-		argument.addEdge(newNode, to, newEdge);
+		var newNode = $scope.system.addNode($scope.nodeIndex.toString(), newData);
+		$scope.system.addEdge(newNode, to, newEdge);
 		// Gotta handle arborjs glitch when there is only one node
-		if(to.data.conclusion && $scope.immediateChildCount == 1) {
+		if(to.data.conclusion && $scope.conclusion.data.childCount == 1) {
 			window.setTimeout(function() {
-				argument.parameters({repulsion: repulsion});
+				$scope.system.parameters({repulsion: $scope.physics.repulsion});
 			}, 250);
 		}
+		
+		return newNode;
 	}
 	
 	$scope.pruneNode = function(node) {
@@ -244,46 +256,66 @@ app.controller('main', function($scope) {
 	}
 	
 	var pruneNode = function(node) {
-		var edges = argument.getEdgesTo(node);
-		for(var i=0; i<edges.length; i++) {
-			pruneNode(edges[i].source);
+		var edgesTo = $scope.system.getEdgesTo(node);
+		for(var i=0; i<edgesTo.length; i++) {
+			pruneNode(edgesTo[i].source);
 		}
+		var edgesFrom = $scope.system.getEdgesFrom(node);
+		if(edgesFrom) edgesFrom[0].target.data.childCount--;
 		// Gotta handle arborjs glitch when there is only one node
 		if(node.data.isImmediateChild) {
-			if($scope.immediateChildCount == 1) {
-				argument.parameters({repulsion: 0});
+			if($scope.conclusion.data.childCount == 1) {
+				$scope.system.parameters({repulsion: 0});
 			}
-			$scope.immediateChildCount--;
 			setTimeout(function() {
-				argument.pruneNode(node);
+				$scope.system.pruneNode(node);
 			}, 250);
 		}
 		else {
-			argument.pruneNode(node);
+			$scope.system.pruneNode(node);
+		}
+	}
+	
+	$scope.showPhysics = function() {
+		$('#physics-panel').modal({
+			onApprove: function() {
+				updatePhysics();
+			}
+		}).modal('show');
+	}
+	
+	updatePhysics = function() {
+		for(var attribute in $scope.userPhysics) {
+			$scope.physics[attribute] = Number($scope.userPhysics[attribute]);
+		}
+		// Gotta handle arborjs glitch when there is only one node
+		if($scope.conclusion.data.childCount > 0) {
+			$scope.system.parameters({
+				repulsion: $scope.physics.repulsion,
+				stiffness: $scope.physics.stiffness,
+				friction: $scope.physics.friction
+			});
 		}
 	}
 	
 	$scope.toggleChildren = function(node, show, includeThisOne) {
-		var edgesTo = argument.getEdgesTo(node);
+		var edgesTo = $scope.system.getEdgesTo(node);
 		for(var i=0; i<edgesTo.length; i++) {
 			edgesTo[i].data.show = show;
 			$scope.toggleChildren(edgesTo[i].source, show, true);
 		}
 		if(includeThisOne) {
 			node.data.show = show;
-		} else {
-			node.data.showChildren = show;
 		}
+		node.data.showChildren = show;
 	}
 
 	$scope.togglePanel = function() {
 		$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('toggle');
 	}
-
-	$scope.eachNode = function() {
-		argument.eachNode( (node, pt) => {
-			console.log(node.data);
-		});
+	
+	$scope.disableChildToggle = function() {
+		return !$scope.selected || $scope.selected.data.conclusion || ($scope.selected.data.childCount == 0);
 	}
 
 	var lib = {
@@ -315,10 +347,12 @@ app.controller('main', function($scope) {
 		},
 		
 		hover: function(node) {
-			$scope.hovered = node;
-			node.data.hovered = true;
-			$scope.$apply();
-			$('#viewport').css({cursor: 'pointer'});
+			if(!$scope.grabbed) {
+				$scope.hovered = node;
+				node.data.hovered = true;
+				$scope.$apply();
+				$('#viewport').css({cursor: 'pointer'});
+			}
 		},
 		
 		unhover: function(node) {
@@ -364,7 +398,7 @@ app.controller('main', function($scope) {
 			
 			//now the point
 			ctx.strokeStyle = color;
-			ctx.lineWidth = 8;
+			ctx.lineWidth = Math.max(4, .2 * $scope.physics.radius);
 			var startArrow = lib.pointOnLine(pt1, pt2, -(offset + 28));
 			ctx.beginPath();
 			ctx.moveTo(startArrow.x, startArrow.y);

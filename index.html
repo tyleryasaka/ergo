@@ -23,11 +23,17 @@
 			<div class="header item">
 				ergo
 			</div>
+			<a class="item" ng-click="showPhysics()">
+				<i class="options icon"></i> Physics
+			</a>
+			<a class="item" ng-show="!allNodesVisible" ng-click="toggleChildren(conclusion, true)">
+				<i class="unhide icon"></i> Show all
+			</a>
 		</div>
 		
 		<canvas id="viewport" width="1000" height="600"></canvas>
 		
-		<button class="ui icon button popup-tips" id="toggle-panel-1" ng-click="togglePanel()" data-content="Expand panel" data-position="right center">
+		<button class="ui icon button popup-tips" id="toggle-panel-1" ng-click="togglePanel()" data-content="Expand panel">
 			<i class="large angle up icon"></i>
 		</button>
 		
@@ -56,16 +62,48 @@
 			</div>
 		</div>
 		
+		<div class="ui small modal" id="physics-panel">
+			<i class="close icon"></i>
+			<div class="header">
+				Physics
+			</div>
+			<div class="content">
+				<div>
+					Size:
+					<input type="range" min="5" max="100" ng-model="userPhysics.radius">
+				</div>
+				<div ng-show="conclusion.data.childCount != 0">
+					Repulsion:
+					<input type="range" min="10" max="1000" ng-model="userPhysics.repulsion">
+				</div>
+				<div ng-show="conclusion.data.childCount != 0">
+					Friction:
+					<input type="range" min="10" max="10000" ng-model="userPhysics.friction">
+				</div>
+				<div ng-show="conclusion.data.childCount != 0">
+					Stiffness:
+					<input type="range" min="100" max="1000" ng-model="userPhysics.stiffness">
+				</div>
+			</div>
+			<div class="actions">
+				<div class="ui green approve button">
+					<i class="checkmark icon"></i>
+					Ok
+				</div>
+			</div>
+		</div>
+		
 	</div>
+	
 	<div class="ui bottom sidebar visible vertical menu">
-		<button class="ui icon button popup-tips" id="toggle-panel-2" ng-click="togglePanel()" data-content="Collapse panel" data-position="right center">
+		<button class="ui icon button popup-tips" id="toggle-panel-2" ng-click="togglePanel()" data-content="Collapse panel">
 			<i class="large angle down icon"></i>
 		</button> 
-		<div class="ui vertical icon buttons" id="panel-menu">
-			<button ng-click="addEdge(selected, true)" class="ui button popup-tips" ng-class="{disabled: !selected}" data-content="New supporting statement" data-position="right center"><i class="large green plus icon"></i></button>
-			<button ng-click="addEdge(selected, false)" class="ui button popup-tips" ng-class="{disabled: !selected}" data-content="New opposing statement" data-position="right center"><i class="large red plus icon"></i></button>
-			<button ng-click="toggleChildren(selected, false)" ng-show="selected.data.showChildren" class="ui button popup-tips" ng-class="{disabled: !selected || selected.data.conclusion}" data-content="Hide children" data-position="right center"><i class="large toggle on icon"></i></button>
-			<button ng-click="toggleChildren(selected, true)" ng-show="!selected.data.showChildren" class="ui button popup-tips" ng-class="{disabled: !selected || selected.data.conclusion}" data-content="Show children" data-position="right center"><i class="large toggle off icon"></i></button>
+		<div class="ui vertical icon buttons" id="panel-menu" ng-show="selected">
+			<button ng-click="addNode(selected, true)" class="ui button popup-tips" ng-class="{disabled: !selected || !selected.data.showChildren}" data-content="New supporting statement" data-position="right center"><i class="large green plus icon"></i></button>
+			<button ng-click="addNode(selected, false)" class="ui button popup-tips" ng-class="{disabled: !selected || !selected.data.showChildren}" data-content="New opposing statement" data-position="right center"><i class="large red plus icon"></i></button>
+			<button ng-click="toggleChildren(selected, false)" ng-show="!selected || selected.data.showChildren" class="ui button popup-tips" ng-class="{disabled: disableChildToggle()}" data-content="Hide children" data-position="right center"><i class="large toggle on icon"></i></button>
+			<button ng-click="toggleChildren(selected, true)" ng-show="selected && !selected.data.showChildren" class="ui button popup-tips" ng-class="{disabled: disableChildToggle()}" data-content="Show children" data-position="right center"><i class="large toggle off icon"></i></button>
 			<button ng-click="pruneNode(selected)" class="ui button popup-tips" ng-class="{disabled: !selected || selected.data.conclusion}" data-content="Delete statement" data-position="right center"><i class="large trash icon"></i></button>
 		</div>
 		<!--button class="ui icon button popup-tips" id="panel-menu" data-content="Actions">
@@ -74,12 +112,13 @@
 			<div class="ui form">
 				<div class="field">
 					<textarea ng-show="selected" ng-model="selected.data.content"></textarea>
-					<span class="light" ng-show="!slected">
+					<span class="light" ng-show="!selected">
 						Nothing selected
 					</span>
 				</div>
 			</div>
 		</div>
 	</div>
+	
 </body>
 </html>
