@@ -27,7 +27,7 @@
 		
 		<canvas id="viewport" width="1000" height="600"></canvas>
 		
-		<button class="ui icon button popup-tips" id="toggle-panel-1" ng-click="togglePanel()" data-content="Expand panel">
+		<button class="ui icon button popup-tips" id="toggle-panel-1" ng-click="togglePanel()" data-content="Expand panel" data-position="right center">
 			<i class="large angle up icon"></i>
 		</button>
 		
@@ -58,22 +58,23 @@
 		
 	</div>
 	<div class="ui bottom sidebar visible vertical menu">
-		<button class="ui icon button popup-tips" id="toggle-panel-2" ng-click="togglePanel()" data-content="Collapse panel">
+		<button class="ui icon button popup-tips" id="toggle-panel-2" ng-click="togglePanel()" data-content="Collapse panel" data-position="right center">
 			<i class="large angle down icon"></i>
-		</button>
+		</button> 
 		<div class="ui vertical icon buttons" id="panel-menu">
-			<button ng-click="addEdge(selected.node, true)" class="ui button popup-tips" ng-class="{disabled: !oneSelected()}" data-content="New supporting statement"><i class="large green plus icon"></i></button>
-			<button ng-click="addEdge(selected.node, false)" class="ui button popup-tips" ng-class="{disabled: !oneSelected()}" data-content="New opposing statement"><i class="large red plus icon"></i></button>
-			<button class="ui button popup-tips" ng-class="{disabled: !oneSelected() || selected.node.data.conclusion}" data-content="Hide children"><i class="large toggle on icon"></i></button>
-			<button ng-click="pruneNode(selected.node)" class="ui button popup-tips" ng-class="{disabled: !oneSelected() || selected.node.data.conclusion}" data-content="Delete statement"><i class="large trash icon"></i></button>
+			<button ng-click="addEdge(selected, true)" class="ui button popup-tips" ng-class="{disabled: !selected}" data-content="New supporting statement" data-position="right center"><i class="large green plus icon"></i></button>
+			<button ng-click="addEdge(selected, false)" class="ui button popup-tips" ng-class="{disabled: !selected}" data-content="New opposing statement" data-position="right center"><i class="large red plus icon"></i></button>
+			<button ng-click="toggleChildren(selected, false)" ng-show="selected.data.showChildren" class="ui button popup-tips" ng-class="{disabled: !selected || selected.data.conclusion}" data-content="Hide children" data-position="right center"><i class="large toggle on icon"></i></button>
+			<button ng-click="toggleChildren(selected, true)" ng-show="!selected.data.showChildren" class="ui button popup-tips" ng-class="{disabled: !selected || selected.data.conclusion}" data-content="Show children" data-position="right center"><i class="large toggle off icon"></i></button>
+			<button ng-click="pruneNode(selected)" class="ui button popup-tips" ng-class="{disabled: !selected || selected.data.conclusion}" data-content="Delete statement" data-position="right center"><i class="large trash icon"></i></button>
 		</div>
 		<!--button class="ui icon button popup-tips" id="panel-menu" data-content="Actions">
 		</button-->
 		<div id="panel-content">
 			<div class="ui form">
 				<div class="field">
-					<textarea ng-show="oneSelected()" ng-model="selected.node.data.content"></textarea>
-					<span class="light" ng-show="!oneSelected()">
+					<textarea ng-show="selected" ng-model="selected.data.content"></textarea>
+					<span class="light" ng-show="!slected">
 						Nothing selected
 					</span>
 				</div>

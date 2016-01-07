@@ -7,6 +7,8 @@ app.controller('main', function($scope) {
 	var stiffness = 1000;
 	var friction = 5000;
 	$scope.selected;
+	$scope.grabbed;
+	$scope.hovered;
 	$scope.nodeIndex = 0;
 	$scope.immediateChildCount = 0;
 
@@ -38,46 +40,52 @@ app.controller('main', function($scope) {
 				
 				// draw edges
 				particleSystem.eachEdge(function(edge, pt1, pt2){
-					ctx.save();
-					var color = edge.data.positive ? "rgba(0, 200, 0, 1)" : "rgba(200, 0, 0, 1)";
-					lib.drawArrow(ctx, pt1, pt2, radius, color);
-					ctx.restore();
+					if(edge.data.show) {
+						ctx.save();
+						var color = edge.data.positive ? "rgba(0, 200, 0, 1)" : "rgba(200, 0, 0, 1)";
+						lib.drawArrow(ctx, pt1, pt2, radius, color);
+						ctx.restore();
+					}
 				});
 
 				// draw nodes
 				particleSystem.eachNode(function(node, pt){
-					ctx.save();
-					ctx.beginPath();
-					ctx.fillStyle = "#ddd"
-					
-					ctx.arc(pt.x, pt.y, radius, 0, 2 * Math.PI);
-					
-					if(node.data.conclusion) {
-						ctx.shadowOffsetX = 0;
-						ctx.shadowOffsetY = 0;
-						ctx.shadowBlur = 0;
-						ctx.shadowColor = "#ddd";
-						ctx.strokeStyle = "#ddd";
-						ctx.fillStyle = "#fefefe";
-						ctx.lineWidth = 8;
-						ctx.stroke();
-					}
-					
-					if(node.data.dragged) {
-						ctx.fillStyle = node.data.conclusion ? "rgba(255,255,255,.7)" : "rgba(200,200,200,.5)";
-					}
-					
-					ctx.fill();
-					
-					if(node.data.selected) {
-						ctx.shadowBlur = null;
+					if(node.data.show) {
+						ctx.save();
 						ctx.beginPath();
-						ctx.arc(pt.x, pt.y, radius / 2, 0, 2 * Math.PI);
-						ctx.fillStyle = "#aaa";
+						
+						ctx.arc(pt.x, pt.y, radius, 0, 2 * Math.PI);
+						
+						if(node.data.conclusion) {
+							ctx.strokeStyle = "#ddd";
+							ctx.lineWidth = 8;
+							ctx.stroke();
+							ctx.fillStyle = "#fefefe";
+						} else {
+							ctx.fillStyle = "#ddd"
+						}
+						
+						if(node.data.hovered) {
+							ctx.fillStyle = node.data.conclusion ? "rgba(255,255,255,.7)" : "rgba(200,200,200,.5)";
+						}
+						
 						ctx.fill();
+						
+						if(node.data.selected) {
+							ctx.shadowBlur = null;
+							ctx.beginPath();
+							ctx.arc(pt.x, pt.y, radius / 2, 0, 2 * Math.PI);
+							ctx.fillStyle = "#aaa";
+							ctx.fill();
+						}
+						
+						/*var distance = node.subtract(_mouseP).magnitude();
+						if(distance <= radius) {
+							ctx.fillStyle = '#000';
+						}*/
+						
+						ctx.restore();
 					}
-					
-					ctx.restore();
 				});
 			},
 			
@@ -90,10 +98,9 @@ app.controller('main', function($scope) {
 			},
 			
 			initMouseHandling:function(){
-				// drag and drop
-				var dragged = null;
 				var dragOffset = null;
 				$scope.selected = null;
+				$scope.grabbed = null;
 
 				// set up a handler object that will initially listen for mousedowns then
 				// for moves and mouseups while dragging
@@ -105,18 +112,12 @@ app.controller('main', function($scope) {
 						
 						if(nearest.distance <= radius) {
 							if($scope.selected) lib.deselect($scope.selected);
-							$scope.selected = dragged = nearest;
-							lib.select($scope.selected);
-							dragged.node.data.dragged = true;
-							dragOffset = dragged.node.p.subtract(particleSystem.fromScreen(_mouseP));
+							lib.grab(nearest.node);
+							lib.select(nearest.node);
+							dragOffset = nearest.node.p.subtract(particleSystem.fromScreen(_mouseP));
 						}
 						else if($scope.selected) {
 							lib.deselect($scope.selected);
-						}
-
-						if (dragged && dragged.node !== null){
-							// while we're dragging, don't let physics move the node
-							dragged.node.fixed = true
 						}
 
 						$(canvas).bind('mousemove', handler.dragged)
@@ -129,20 +130,16 @@ app.controller('main', function($scope) {
 						var pos = $(canvas).offset();
 						var s = arbor.Point(e.pageX-pos.left, e.pageY-pos.top);
 						
-						if (dragged && dragged.node !== null){
+						if ($scope.grabbed){
 							var p = particleSystem.fromScreen(s).add(dragOffset);
-							dragged.node.p = p;
+							$scope.grabbed.p = p;
 						}
 						
 						return false
 					},
 
 					dropped:function(e){
-						if (dragged===null || dragged.node===undefined) return
-						if (dragged.node !== null) dragged.node.fixed = false
-						dragged.node.tempMass = 1000;
-						dragged.node.data.dragged = false;
-						dragged = null;
+						if($scope.grabbed) lib.ungrab($scope.grabbed);
 						$(canvas).unbind('mousemove', handler.dragged)
 						$(window).unbind('mouseup', handler.dropped)
 						_mouseP = null
@@ -173,34 +170,62 @@ app.controller('main', function($scope) {
 			}
 		});
 		
+		$('#viewport').mousemove( function(e) {
+			var pos = $(canvas).offset();
+			_mouseP = arbor.Point(e.pageX-pos.left, e.pageY-pos.top)
+			var nearest = particleSystem.nearest(_mouseP);
+
+			if(nearest.distance <= radius) {
+				lib.hover(nearest.node);
+			} else if($scope.hovered) {
+				lib.unhover($scope.hovered);
+			}
+		});
+		
 		return that
 	}
 
 	$(document).ready(function(){
-		argument = arbor.ParticleSystem(0, stiffness, friction) // repulsion/stiffness/friction (500, 600, 0.5)
-		argument.parameters({gravity: false}) // use center-gravity to make the graph settle nicely (ymmv)
+		argument = arbor.ParticleSystem() // repulsion/stiffness/friction (500, 600, 0.5)
+		argument.parameters({
+			repulsion: 0,
+			stiffness: stiffness,
+			friction: friction,
+			gravity: false
+		});
 		argument.renderer = Renderer("#viewport") // our newly created renderer will have its .init() method called shortly by sys...
 
 		// initial conclusion node
-		argument.addNode('conclusion', {conclusion: true, content: ""});
+		argument.addNode('conclusion', {
+			conclusion: true,
+			content: "",
+			showChildren: true,
+			show: true
+		});
 		
 		// initialize popup tips
 		$('.popup-tips').popup();
 	});
 	
-	$scope.oneSelected = function() {
-		return $scope.selected && $scope.selected.node.data.selected;
-	}
-	
 	$scope.addEdge = function(to, positive) {
+		var newData = {
+			conclusion: false,
+			content: '',
+			showChildren: true,
+			show: true
+		};
+		var newEdge = {
+			positive: positive,
+			show: true
+		};
 		$scope.nodeIndex++;
-		var newData = {conclusion: false, content: ''};
+		// Gotta handle arborjs glitch when there is only one node
 		if(to.data.conclusion) {
 			$scope.immediateChildCount++;
 			newData.isImmediateChild = true;
 		}
 		var newNode = argument.addNode($scope.nodeIndex.toString(), newData);
-		argument.addEdge(newNode, to, {positive: positive});
+		argument.addEdge(newNode, to, newEdge);
 		// Gotta handle arborjs glitch when there is only one node
 		if(to.data.conclusion && $scope.immediateChildCount == 1) {
 			window.setTimeout(function() {
@@ -212,6 +237,7 @@ app.controller('main', function($scope) {
 	$scope.pruneNode = function(node) {
 		$('#confirm-delete').modal({
 			onApprove: function() {
+				lib.deselect(node);
 				pruneNode(node);
 			}
 		}).modal('show');
@@ -236,6 +262,19 @@ app.controller('main', function($scope) {
 			argument.pruneNode(node);
 		}
 	}
+	
+	$scope.toggleChildren = function(node, show, includeThisOne) {
+		var edgesTo = argument.getEdgesTo(node);
+		for(var i=0; i<edgesTo.length; i++) {
+			edgesTo[i].data.show = show;
+			$scope.toggleChildren(edgesTo[i].source, show, true);
+		}
+		if(includeThisOne) {
+			node.data.show = show;
+		} else {
+			node.data.showChildren = show;
+		}
+	}
 
 	$scope.togglePanel = function() {
 		$('.ui.sidebar').sidebar('setting', {dimPage: false, transition: 'overlay', closable: false}).sidebar('toggle');
@@ -248,16 +287,45 @@ app.controller('main', function($scope) {
 	}
 
 	var lib = {
-		select: function(selected) {
-			//$('#panel-content textarea').val(selected.node.data.content);
-			selected.node.data.selected = true;
+		select: function(node) {
+			$scope.selected = node;
+			node.data.selected = true;
 			$scope.$apply();
 		},
 		
-		deselect: function(selected) {
-			//$('#panel-content textarea').val('');
-			selected.node.data.selected = false;
+		deselect: function(node) {
+			$scope.selected = null;
+			node.data.selected = false;
 			$scope.$apply();
+		},
+		
+		grab: function(node) {
+			$scope.grabbed = node;
+			node.data.grabbed = true;
+			// while we're dragging, don't let physics move the node
+			node.fixed = true
+			$scope.$apply();
+		},
+		
+		ungrab: function(node) {
+			$scope.grabbed = null;
+			node.data.grabbed = false;
+			node.fixed = false;
+			$scope.$apply();
+		},
+		
+		hover: function(node) {
+			$scope.hovered = node;
+			node.data.hovered = true;
+			$scope.$apply();
+			$('#viewport').css({cursor: 'pointer'});
+		},
+		
+		unhover: function(node) {
+			$scope.hovered = null;
+			node.data.hovered = false;
+			$scope.$apply();
+			$('#viewport').css({cursor: 'auto'});
 		},
 		
 		pointOnLine: function(pt1, pt2, offset) {
