@@ -5,10 +5,28 @@ app.controller('main', function($scope) {
 	$scope.userPhysics = { // string values from input
 		radius: 40,
 		repulsion: 50,
-		stiffness: 1000,
+		stiffness: 100,
 		friction: 5000
 	};
-	$scope.physics = {}; // string values will be onverted to numbers here
+	$scope.defaultPhysics = {
+		repulsion: 0,
+		stiffness: 100,
+		friction: 5000,
+		gravity: false
+	};
+	$scope.physics = {
+		radius: 40,
+		repulsion: 50,
+		stiffness: 100,
+		friction: 5000
+	}; // string values will be onverted to numbers here
+	$scope.physicsBounds = {
+		radius: {min: 5, max: 100},
+		repulsion: {min: 0, max: 1000},
+		friction: {min: 10, max: 10000},
+		stiffness: {min: 10, max: 1000}
+	}
+	$scope.physicsPanelOpened = false;
 	$scope.conclusion;
 	$scope.selected;
 	$scope.grabbed;
@@ -55,6 +73,7 @@ app.controller('main', function($scope) {
 
 				// draw nodes
 				particleSystem.eachNode(function(node, pt){
+					
 					if(node.data.show) {
 						ctx.save();
 						ctx.beginPath();
@@ -189,32 +208,6 @@ app.controller('main', function($scope) {
 		
 		return that
 	}
-
-	$(document).ready(function(){
-		for(var attribute in $scope.userPhysics) {
-			$scope.physics[attribute] = Number($scope.userPhysics[attribute]);
-		}
-		$scope.system = arbor.ParticleSystem() // repulsion/stiffness/friction (500, 600, 0.5)
-		$scope.system.parameters({
-			repulsion: 0,
-			stiffness: $scope.physics.stiffness,
-			friction: $scope.physics.friction,
-			gravity: false
-		});
-		$scope.system.renderer = Renderer("#viewport") // our newly created renderer will have its .init() method called shortly by sys...
-
-		// initial conclusion node
-		$scope.conclusion = $scope.system.addNode('conclusion', {
-			conclusion: true,
-			content: "",
-			showChildren: true,
-			show: true,
-			childCount: 0
-		});
-		
-		// initialize popup tips
-		$('.popup-tips').popup();
-	});
 	
 	$scope.addNode = function(to, positive) {
 		to.data.childCount++;
@@ -261,7 +254,7 @@ app.controller('main', function($scope) {
 			pruneNode(edgesTo[i].source);
 		}
 		var edgesFrom = $scope.system.getEdgesFrom(node);
-		if(edgesFrom) edgesFrom[0].target.data.childCount--;
+		if(edgesFrom.length > 0) edgesFrom[0].target.data.childCount--;
 		// Gotta handle arborjs glitch when there is only one node
 		if(node.data.isImmediateChild) {
 			if($scope.conclusion.data.childCount == 1) {
@@ -279,23 +272,20 @@ app.controller('main', function($scope) {
 	$scope.showPhysics = function() {
 		$('#physics-panel').modal({
 			onApprove: function() {
-				updatePhysics();
-			}
+				lib.updatePhysics();
+			},
+			closable: false
 		}).modal('show');
+		if(!$scope.physicsPanelOpened) {
+			$scope.physicsPanelOpened = true;
+			lib.initializeRanges();
+		}
 	}
 	
-	updatePhysics = function() {
-		for(var attribute in $scope.userPhysics) {
-			$scope.physics[attribute] = Number($scope.userPhysics[attribute]);
-		}
-		// Gotta handle arborjs glitch when there is only one node
-		if($scope.conclusion.data.childCount > 0) {
-			$scope.system.parameters({
-				repulsion: $scope.physics.repulsion,
-				stiffness: $scope.physics.stiffness,
-				friction: $scope.physics.friction
-			});
-		}
+	$scope.showImport = function() {
+		$('#import-panel').modal({
+			onApprove: lib.loadState
+		}).modal('show');
 	}
 	
 	$scope.toggleChildren = function(node, show, includeThisOne) {
@@ -316,6 +306,19 @@ app.controller('main', function($scope) {
 	
 	$scope.disableChildToggle = function() {
 		return !$scope.selected || $scope.selected.data.conclusion || ($scope.selected.data.childCount == 0);
+	}
+	
+	$scope.saveState = function() {
+		if($scope.selected) $scope.selected.data.selected = false;
+		var state = {};
+		state.physics = $scope.physics;
+		state.userPhysics = $scope.userPhysics;
+		state.nodeIndex = $scope.nodeIndex;
+		state.graph = {
+			node: $scope.conclusion,
+			premises: lib.getPremises($scope.conclusion)
+		};
+		lib.download('ergo.json', JSON.stringify(state));
 	}
 
 	var lib = {
@@ -409,6 +412,96 @@ app.controller('main', function($scope) {
 			ctx.restore();
 		},
 		
+		updatePhysics: function() {
+			for(var attribute in $scope.userPhysics) {
+				$scope.physics[attribute] = Number($scope.userPhysics[attribute]);
+			}
+			// Gotta handle arborjs glitch when there is only one node
+			if($scope.conclusion.data.childCount > 0) {
+				$scope.system.parameters({
+					repulsion: $scope.physics.repulsion,
+					stiffness: $scope.physics.stiffness,
+					friction: $scope.physics.friction
+				});
+			}
+		},
+		
+		loadState: function() {
+			$('#viewport').off();
+			// get imported data
+			var file = document.getElementById('import-file').files[0];
+			var data;
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				if($scope.selected) lib.deselect($scope.selected);
+				data = JSON.parse(reader.result);
+				// delete everything
+				$scope.system.stop();
+				//pruneNode($scope.conclusion);
+				// reset physics
+				$scope.physics = data.physics;
+				$scope.userPhysics = data.userPhysics;
+				$scope.nodeIndex = data.nodeIndex;
+				$scope.system = arbor.ParticleSystem();
+				$scope.system.parameters({
+					repulsion: data.physics.repulsion,
+					friction: data.physics.friction,
+					stiffness: data.physics.stiffness,
+					gravity: false
+				});
+				$scope.system.renderer = Renderer("#viewport");
+				// create nodes/edges from data
+				$scope.conclusion = $scope.system.addNode(data.graph.node.name, data.graph.node.data);
+				lib.connectPremises($scope.conclusion, data.graph.premises);
+			}
+			reader.readAsText(file);
+		},
+		
+		initializeRanges: function() {
+			/*for(property in $scope.userPhysics) {
+				$('#physics-' + property + ' .range').range({
+					min: $scope.physicsBounds[property].min,
+					max: $scope.physicsBounds[property].max,
+					start: $scope.physics[property],
+					input: '#physics-' + property + ' input'
+				});
+			}*/
+		},
+		
+		getPremises: function(node) {
+			var edges = $scope.system.getEdgesTo(node);
+			var premises = [];
+			for(var e in edges) {
+				premises.push({
+					edge: edges[e],
+					node: edges[e].source,
+					premises: lib.getPremises(edges[e].source)
+				});
+			}
+			return premises;
+		},
+		
+		connectPremises: function(node, premises) {
+			for(var p in premises) {
+				var pNode = $scope.system.addNode(premises[p].node.name, premises[p].node.data);
+				var pEdge = $scope.system.addEdge(pNode, node, premises[p].edge.data);
+				lib.connectPremises(pNode, premises[p].premises);
+			}
+		},
+		
+		download: function(filename, text) {
+			var element = document.createElement('a');
+			element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+			element.setAttribute('download', filename);
+
+			element.style.display = 'none';
+			document.body.appendChild(element);
+
+			element.click();
+
+			document.body.removeChild(element);
+		}
+		
 		// not using right now
 		/*drawEllipse: function(context, centerX, centerY, width, height, color) {
 			
@@ -431,6 +524,24 @@ app.controller('main', function($scope) {
 			context.closePath();	
 		}*/
 	}
+
+	$(document).ready(function(){
+		$scope.system = arbor.ParticleSystem(); // repulsion/stiffness/friction (500, 600, 0.5)
+		$scope.system.parameters($scope.defaultPhysics);
+		$scope.system.renderer = Renderer("#viewport");
+
+		// initial conclusion node
+		$scope.conclusion = $scope.system.addNode('conclusion', {
+			conclusion: true,
+			content: "",
+			showChildren: true,
+			show: true,
+			childCount: 0
+		});
+		
+		// initialize popup tips
+		$('.popup-tips').popup();
+	});
 	
 });
 

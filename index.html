@@ -26,6 +26,12 @@
 			<a class="item" ng-click="showPhysics()">
 				<i class="options icon"></i> Physics
 			</a>
+			<a class="item" ng-click="showImport()">
+				Import
+			</a>
+			<a class="item" ng-click="saveState()">
+				Export
+			</a>
 			<a class="item" ng-show="!allNodesVisible" ng-click="toggleChildren(conclusion, true)">
 				<i class="unhide icon"></i> Show all
 			</a>
@@ -68,13 +74,35 @@
 				Physics
 			</div>
 			<div class="content">
+				
+				<!--div id="physics-radius">
+					Size:
+					<div class="ui grey range"></div>
+					<input type="hidden" ng-model="userPhysics.radius">
+				</div>
+				<div ng-show="conclusion.data.childCount != 0" id="physics-repulsion">
+					Repulsion:
+					<div class="ui grey range"></div>
+					<input type="hidden" ng-model="userPhysics.repulsion">
+				</div>
+				<div ng-show="conclusion.data.childCount != 0" id="physics-friction">
+					Friction:
+					<div class="ui grey range"></div>
+					<input type="hidden" ng-model="userPhysics.friction">
+				</div>
+				<div ng-show="conclusion.data.childCount != 0" id="physics-stiffness">
+					Stiffness:
+					<div class="ui grey range"></div>
+					<input type="hidden" ng-model="userPhysics.stiffness">
+				</div-->
+				
 				<div>
 					Size:
 					<input type="range" min="5" max="100" ng-model="userPhysics.radius">
 				</div>
 				<div ng-show="conclusion.data.childCount != 0">
 					Repulsion:
-					<input type="range" min="10" max="1000" ng-model="userPhysics.repulsion">
+					<input type="range" min="0" max="1000" ng-model="userPhysics.repulsion">
 				</div>
 				<div ng-show="conclusion.data.childCount != 0">
 					Friction:
@@ -82,13 +110,29 @@
 				</div>
 				<div ng-show="conclusion.data.childCount != 0">
 					Stiffness:
-					<input type="range" min="100" max="1000" ng-model="userPhysics.stiffness">
+					<input type="range" min="10" max="1000" ng-model="userPhysics.stiffness">
 				</div>
 			</div>
 			<div class="actions">
 				<div class="ui green approve button">
 					<i class="checkmark icon"></i>
 					Ok
+				</div>
+			</div>
+		</div>
+		
+		<div class="ui small modal" id="import-panel">
+			<i class="close icon"></i>
+			<div class="header">
+				Import
+			</div>
+			<div class="content">
+				<input type="file" accept=".json" id="import-file">
+			</div>
+			<div class="actions">
+				<div class="ui green approve button">
+					<i class="checkmark icon"></i>
+					Import
 				</div>
 			</div>
 		</div>
