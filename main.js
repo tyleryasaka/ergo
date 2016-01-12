@@ -3,7 +3,7 @@ var app = angular.module('ergo', []);
 app.controller('main', function($scope) {
 	$scope.system;
 	$scope.userPhysics = { // string values from input
-		radius: 40,
+		radius: 30,
 		repulsion: 50,
 		stiffness: 100,
 		friction: 5000
@@ -15,7 +15,6 @@ app.controller('main', function($scope) {
 		gravity: false
 	};
 	$scope.physics = {
-		radius: 40,
 		repulsion: 50,
 		stiffness: 100,
 		friction: 5000
@@ -33,6 +32,11 @@ app.controller('main', function($scope) {
 	$scope.hovered;
 	$scope.nodeIndex = 0;
 	$scope.allNodesVisible = true;
+	$scope.scaleRadius = 0;
+	$scope.viewport = {
+		width: 0,
+		height: 0
+	}
 
 	var Renderer = function(canvas){
 		var canvas = $(canvas).get(0)
@@ -41,7 +45,7 @@ app.controller('main', function($scope) {
 		var container = window;
 
 		var that = {
-			init:function(system){
+			init:function(system) {
 				particleSystem = system
 
 				particleSystem.screenSize(canvas.width, canvas.height) 
@@ -62,7 +66,7 @@ app.controller('main', function($scope) {
 				ctx.fillRect(0,0, canvas.width, canvas.height);
 				
 				// draw edges
-				particleSystem.eachEdge(function(edge, pt1, pt2){
+				particleSystem.eachEdge(function(edge, pt1, pt2) {
 					if(edge.data.show) {
 						ctx.save();
 						var color = edge.data.positive ? "rgba(0, 200, 0, 1)" : "rgba(200, 0, 0, 1)";
@@ -72,7 +76,7 @@ app.controller('main', function($scope) {
 				});
 
 				// draw nodes
-				particleSystem.eachNode(function(node, pt){
+				particleSystem.eachNode(function(node, pt) {
 					
 					if(node.data.show) {
 						ctx.save();
@@ -113,15 +117,16 @@ app.controller('main', function($scope) {
 				$scope.$apply();
 			},
 			
-			resize:function(){
+			resize:function() {
 				var w = $(container).width(),
 						h = $(container).height();
 				canvas.width = w; canvas.height = h // resize the canvas element to fill the screen
+				lib.determineRadius();
 				particleSystem.screenSize(w,h); // inform the system so it can map coords for us
 				that.redraw();
 			},
 			
-			initMouseHandling:function(){
+			initMouseHandling:function() {
 				var dragOffset = null;
 				$scope.selected = null;
 				$scope.grabbed = null;
@@ -162,7 +167,7 @@ app.controller('main', function($scope) {
 						return false
 					},
 
-					dropped:function(e){
+					dropped:function(e) {
 						if($scope.grabbed) lib.ungrab($scope.grabbed);
 						$(canvas).unbind('mousemove', handler.dragged)
 						$(window).unbind('mouseup', handler.dropped)
@@ -397,7 +402,7 @@ app.controller('main', function($scope) {
 			ctx.beginPath()
 			ctx.moveTo(pt1.x, pt1.y)
 			ctx.lineTo(dest.x, dest.y);
-			ctx.stroke()
+			ctx.stroke();
 			
 			//now the point
 			ctx.strokeStyle = color;
@@ -406,16 +411,16 @@ app.controller('main', function($scope) {
 			ctx.beginPath();
 			ctx.moveTo(startArrow.x, startArrow.y);
 			ctx.lineTo(dest.x, dest.y);
-			//ctx.lineTo(100,25);
 			ctx.stroke();
 			
 			ctx.restore();
 		},
 		
 		updatePhysics: function() {
-			for(var attribute in $scope.userPhysics) {
-				$scope.physics[attribute] = Number($scope.userPhysics[attribute]);
-			}
+			$scope.physics.radius = $scope.scaleRadius * $scope.userPhysics.radius;
+			$scope.physics.repulsion = $scope.userPhysics.repulsion;
+			$scope.physics.stiffness = $scope.userPhysics.stiffness;
+			$scope.physics.friction = $scope.userPhysics.friction;
 			// Gotta handle arborjs glitch when there is only one node
 			if($scope.conclusion.data.childCount > 0) {
 				$scope.system.parameters({
@@ -435,12 +440,11 @@ app.controller('main', function($scope) {
 			reader.onload = function(e) {
 				if($scope.selected) lib.deselect($scope.selected);
 				data = JSON.parse(reader.result);
-				// delete everything
 				$scope.system.stop();
-				//pruneNode($scope.conclusion);
 				// reset physics
-				$scope.physics = data.physics;
 				$scope.userPhysics = data.userPhysics;
+				$scope.physics = data.physics;
+				lib.determineRadius();
 				$scope.nodeIndex = data.nodeIndex;
 				$scope.system = arbor.ParticleSystem();
 				$scope.system.parameters({
@@ -451,6 +455,7 @@ app.controller('main', function($scope) {
 				});
 				$scope.system.renderer = Renderer("#viewport");
 				// create nodes/edges from data
+				$scope.imports = {};
 				$scope.conclusion = $scope.system.addNode(data.graph.node.name, data.graph.node.data);
 				lib.connectPremises($scope.conclusion, data.graph.premises);
 			}
@@ -458,23 +463,50 @@ app.controller('main', function($scope) {
 		},
 		
 		initializeRanges: function() {
-			/*for(property in $scope.userPhysics) {
-				$('#physics-' + property + ' .range').range({
-					min: $scope.physicsBounds[property].min,
-					max: $scope.physicsBounds[property].max,
-					start: $scope.physics[property],
-					input: '#physics-' + property + ' input'
-				});
-			}*/
+			$('#physics-radius .range').range({
+				min: $scope.physicsBounds['radius'].min,
+				max: $scope.physicsBounds['radius'].max,
+				start: $scope.physics['radius'],
+				onChange: function(value) {
+					$scope.userPhysics['radius'] = value;
+				}
+			});
+			$('#physics-repulsion .range').range({
+				min: $scope.physicsBounds['repulsion'].min,
+				max: $scope.physicsBounds['repulsion'].max,
+				start: $scope.physics['repulsion'],
+				onChange: function(value) {
+					$scope.userPhysics['repulsion'] = value;
+				}
+			});
+			$('#physics-friction .range').range({
+				min: $scope.physicsBounds['friction'].min,
+				max: $scope.physicsBounds['friction'].max,
+				start: $scope.physics['friction'],
+				onChange: function(value) {
+					$scope.userPhysics['friction'] = value;
+				}
+			});
+			$('#physics-stiffness .range').range({
+				min: $scope.physicsBounds['stiffness'].min,
+				max: $scope.physicsBounds['stiffness'].max,
+				start: $scope.physics['stiffness'],
+				onChange: function(value) {
+					$scope.userPhysics['stiffness'] = value;
+				}
+			});
 		},
 		
 		getPremises: function(node) {
 			var edges = $scope.system.getEdgesTo(node);
 			var premises = [];
 			for(var e in edges) {
+				var node = edges[e].source;
+				node.data.x = node._p.x;
+				node.data.y = node._p.y;
 				premises.push({
 					edge: edges[e],
-					node: edges[e].source,
+					node: node,
 					premises: lib.getPremises(edges[e].source)
 				});
 			}
@@ -500,6 +532,15 @@ app.controller('main', function($scope) {
 			element.click();
 
 			document.body.removeChild(element);
+		},
+		
+		determineRadius: function() {
+			$scope.viewport.width = $('#viewport').width();
+			$scope.viewport.height = $('#viewport').height();
+			var viewportArea = $scope.viewport.width * $scope.viewport.height;
+			var standardNodeArea = viewportArea * .05;
+			$scope.scaleRadius = ( Math.sqrt(standardNodeArea) * .5 ) / 100;
+			$scope.physics.radius = $scope.scaleRadius * $scope.userPhysics.radius;
 		}
 		
 		// not using right now
@@ -526,6 +567,7 @@ app.controller('main', function($scope) {
 	}
 
 	$(document).ready(function(){
+		lib.determineRadius();
 		$scope.system = arbor.ParticleSystem(); // repulsion/stiffness/friction (500, 600, 0.5)
 		$scope.system.parameters($scope.defaultPhysics);
 		$scope.system.renderer = Renderer("#viewport");

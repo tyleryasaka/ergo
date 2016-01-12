@@ -37,3 +37,12 @@ body {
 .light {
 	opacity: .5;
 }
+
+#physics-panel .ui.range {
+	margin: 20px auto;
+}
+
+#viewport {
+	width: 100vw;
+	height: 100vh;
+}
